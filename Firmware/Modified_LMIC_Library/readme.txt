@@ -1,0 +1,4 @@
+To get the LoRa module to work I had to modify the name of a function in this library to get around a naming conflict. There were two functions being used which were named hal_init. One was used by this library, and I believe the other one is used in the driver for the ESP board. I modified the one used by this library to be named hal_init1. I hope I didn't break anything too badly, but I can get this code to talk to the gateway.
+
+To use the library, just unzip this file and paste the contents into your Arduino libraries folder. The path should look something like "Arduino\libraries\arduino-lmic" where the arduino-lmic library folder contains the src folder, examples folder, etc.
+-Elijah
