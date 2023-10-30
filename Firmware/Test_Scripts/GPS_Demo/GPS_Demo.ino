@@ -1,4 +1,12 @@
-
+/*
+ Pin Connections
+ GPS      ESP
+ VCC      3.3V
+ GND      GND
+ RX       GPIOP3
+ TX       GPIOP4
+ PPS      No Connection
+*/
 
 #include <TinyGPSPlus.h>
 #include <SoftwareSerial.h>
