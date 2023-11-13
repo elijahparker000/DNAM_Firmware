@@ -193,6 +193,17 @@ void onEvent (ev_t ev) {
               Serial.print(F("Received "));
               Serial.print(LMIC.dataLen);
               Serial.println(F(" bytes of payload"));
+
+              // Print each byte of the payload in hexadecimal format
+              Serial.print(F("Payload: "));
+              for (int i = 0; i < LMIC.dataLen; i++) {
+                  if (LMIC.frame[LMIC.dataBeg + i] < 0x10) {
+                      Serial.print('0'); // Print leading zero for values less than 0x10
+                  }
+                  Serial.print(LMIC.frame[LMIC.dataBeg + i], HEX);
+                  Serial.print(" ");
+              }
+              Serial.println();
             }
             // Schedule next transmission
             os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
