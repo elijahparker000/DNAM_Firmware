@@ -1,10 +1,10 @@
 /*
 Note from Elijah:
 
-This is a modified version of the ttn_otaa script which acts as a sort of overall script for our setup. 
-It probably needs some more work on the GPS side of things but it can send sensor data and it prints out data it receives from the gateway.
+This is a rough overall sketch for our project. It normally sends the temp, humidity, and atmospheric pressure data, but
+when it receives the bytes "01" from the gateway, it's next send will be the GPS data. I think there may be some timing issues 
+which are causing some of the messages to not go through properly, but I need to do more research. Ultimately, it works.
 
-This is the sketch I used to connect our LoRa module to the gateway. 
 The code is taken from an example for this library which you will need to install: https://github.com/mcci-catena/arduino-lmic
 
 Like the comment below says, make sure you have a device set up for OTAA on TTN
@@ -18,19 +18,7 @@ being formatted with the "0x" and commas
 
 Do not forget to define the radio type correctly in arduino-lmic/project_config/lmic_project_config.h
 
-And lastly, this sketch is set up with the LoRa module connected as follows:
-Lora Module     ESP
-    Vin        3.3V
-    GND        GND
-    EN         3.3V
-    G0         GPIOP2
-    SCK        GPIOP18
-    MISO       GPIOP19
-    MOSI       GPIOP23
-    CS         GPIOP5
-    RST        GPIOP16
-    G1         GPIOP34
-    G2         GPIOP35
+The correct pin definitions can be found at the beginning of the code. 
 */
 
 /*******************************************************************************
@@ -74,14 +62,47 @@ Lora Module     ESP
 #include <TinyGPSPlus.h>
 #include <SoftwareSerial.h>
 
-static const int RXPin = 4, TXPin = 3;
-static const uint32_t GPSBaud = 9600;
+// Define a struct for pin configurations
+struct PinConfig {
+    // GPS Module
+    int gpsRX;
+    int gpsTX;
 
+    // BME280 Sensor
+    int bmeSDA;
+    int bmeSCL;
+
+    // LoRa Module
+    int loraNSS;
+    int loraDIO0;
+    int loraDIO1;
+    int loraDIO2;
+    int loraRST;
+};
+
+// Initialize the pin configuration
+const PinConfig pinConfig = {
+    // GPS Module
+    .gpsRX = 4,  // RX pin for GPS
+    .gpsTX = 3,  // TX pin for GPS
+
+    // BME280 Sensor
+    .bmeSDA = 21, // SDA pin for BME280 //for human reference only; this definition is not used later in code
+    .bmeSCL = 22, // SCL pin for BME280 //for human reference only; this definition is not used later in code
+
+    // LoRa Module
+    .loraNSS = 5,     // NSS pin for LoRa
+    .loraDIO0 = 2,    // DIO0 pin for LoRa
+    .loraDIO1 = 34,   // DIO1 pin for LoRa
+    .loraDIO2 = 35,   // DIO2 pin for LoRa
+    .loraRST = 16     // RST pin for LoRa
+};
+
+static const uint32_t GPSBaud = 9600;
 // The TinyGPSPlus object
 TinyGPSPlus gps;
-
 // The serial connection to the GPS device
-SoftwareSerial ss(RXPin, TXPin);
+SoftwareSerial ss(pinConfig.gpsRX, pinConfig.gpsTX);
 
 BME280I2C bme;    // Default : forced mode, standby time = 1000 ms
                   // Oversampling = pressure ×1, temperature ×1, humidity ×1, filter off,
@@ -117,19 +138,18 @@ void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
 static const u1_t PROGMEM APPKEY[16] = { 0x75, 0x94, 0x2F, 0xB7, 0xD7, 0xB4, 0x95, 0xD4, 0x07, 0xE4, 0x7E, 0xFA, 0x47, 0x1E, 0xC4, 0x4F };
 void os_getDevKey (u1_t* buf) {  memcpy_P(buf, APPKEY, 16);}
 
-static uint8_t mydata[] = "Hello, world!";
 static osjob_t sendjob;
 
 // Schedule TX every this many seconds (might become longer due to duty
 // cycle limitations).
 const unsigned TX_INTERVAL = 60;
 
-// Pin mapping
+// Pin mapping for LoRa module. This still ultimately uses the pins configured above.
 const lmic_pinmap lmic_pins = {
-    .nss = 5,
-    .rxtx = LMIC_UNUSED_PIN,
-    .rst = 16,
-    .dio = {2, 34, 35},
+    .nss = pinConfig.loraNSS,
+    .rxtx = LMIC_UNUSED_PIN, //not used
+    .rst = pinConfig.loraRST,
+    .dio = {pinConfig.loraDIO0, pinConfig.loraDIO1, pinConfig.loraDIO2},
 };
 
 void printHex2(unsigned v) {
@@ -271,31 +291,26 @@ void onEvent (ev_t ev) {
     }
 }
 
-void do_send(osjob_t* j){
+void do_send(osjob_t* j) {
     // Check if we received "01" from the gateway to send GPS data
     if (receivedDataIs01()) {
-        // Read GPS data
-        while (ss.available() > 0)
-            if (gps.encode(ss.read()))
-                break; // We've got data, break loop
-
         // Check if GPS location is valid
         if (gps.location.isValid()) {
             char gpsData[64];
             snprintf(gpsData, sizeof(gpsData), "%.6f,%.6f", gps.location.lat(), gps.location.lng());
 
             // Print the data before sending
-            Serial.print("Sending data: ");
+            Serial.print("Sending GPS data: ");
             Serial.println(gpsData);
 
             // Send GPS data
             sendData(gpsData);
+            clearReceivedData(); // Clear the received data flag
         }
         else {
-            Serial.println(F("GPS data not valid"));
-            // Optionally, you can schedule a retry here
-            clearReceivedData(); // Reset the condition here as well
-            // For now, we'll just schedule the next regular sensor data transmission
+            Serial.println(F("GPS data not valid, scheduling next send"));
+            clearReceivedData(); // Clear the received data flag
+            // Schedule the next regular sensor data transmission
             os_setTimedCallback(j, os_getTime() + sec2osticks(TX_INTERVAL), do_send);
         }
     } else {
@@ -307,8 +322,9 @@ void do_send(osjob_t* j){
         snprintf(sensorData, sizeof(sensorData), "%.2fC,%.2f%%,%.2fPa", temp, hum, pres);
 
         // Print the data before sending
-        Serial.print("Sending data: ");
+        Serial.print("Sending sensor data: ");
         Serial.println(sensorData);
+
         // Send sensor data
         sendData(sensorData);
     }
@@ -385,6 +401,30 @@ void setup() {
     do_send(&sendjob);
 }
 
+
+/*
+This function is a little weird. Basically, it's an attempt to give both the GPS and LoRa modules enough CPU time.
+It may not be necessary, and may be making the problem of dropped messages worse. I need to learn more about
+the LoRaWAN protocol in general I think.
+*/
 void loop() {
+    // Define a maximum number of bytes to process per loop iteration
+    const int maxGPSBytesPerLoop = 10;
+    int processedBytes = 0;
+
+    // Process GPS data, but limit the number of bytes to avoid blocking
+    while (ss.available() > 0 && processedBytes < maxGPSBytesPerLoop) {
+        if (gps.encode(ss.read())) {
+            // Optionally handle new GPS data here if needed
+        }
+        processedBytes++;
+    }
+
+    // Call the LMIC function to handle LoRaWAN communication
     os_runloop_once();
+
+    // (Optional) Add a small delay to prevent loop from running too fast,
+    // but keep it short to ensure responsiveness
+    delay(10);
 }
+
