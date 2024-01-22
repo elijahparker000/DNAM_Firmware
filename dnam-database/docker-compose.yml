@@ -1,0 +1,16 @@
+version: '3.1'
+
+services:
+  dnam-mariadb:
+    image: mariadb
+    restart: unless-stopped
+    environment:
+      - MARIADB_USER=${MARIADB_USER}
+      - MARIADB_PASSWORD=${MARIADB_PASSWORD}
+      - MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD}
+      - MARIADB_DATABASE=dnam01
+    command: ['--skip-mysql', '--skip-name-resolve', '--max-connections=250']
+    volumes:
+      - ./db:/var/lib/mysql
+    ports:
+      - "3306:3306"
