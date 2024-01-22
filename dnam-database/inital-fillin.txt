@@ -1,0 +1,65 @@
+-- Sensor Types
+CREATE TABLE SensorType (
+    sensor_type_id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    connection_type VARCHAR(255),
+    default_pull_rate INT,
+    default_name VARCHAR(255),
+    default_alarm_enabled BOOLEAN,
+    default_lower_threshold FLOAT,
+    default_upper_threshold FLOAT
+);
+
+-- Sensors
+CREATE TABLE Sensor (
+    sensor_id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    sensor_name VARCHAR(255),
+    sensor_type_id CHAR(36) REFERENCES SensorType(sensor_type_id),
+    pull_rate INT,
+    update_flag BOOLEAN,
+    push_flag BOOLEAN,
+    data_unit VARCHAR(50),
+    public_key VARCHAR(255),
+    port_number INT,
+    alarm_enabled BOOLEAN,
+    lower_threshold FLOAT,
+    upper_threshold FLOAT
+);
+
+-- Sensor Data
+CREATE TABLE SensorData (
+    data_id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    sensor_id CHAR(36) REFERENCES Sensor(sensor_id),
+    timestamp TIMESTAMP,
+    value FLOAT,
+    status_code INT
+);
+
+-- User-Sensor Link
+CREATE TABLE UserSensor (
+    user_sensor_id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    user_id CHAR(36), -- References your Django User Table
+    sensor_id CHAR(36) REFERENCES Sensor(sensor_id)
+);
+
+-- Sensor Groups
+CREATE TABLE SensorGroup (
+    group_id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    group_name VARCHAR(255),
+    description TEXT
+);
+
+-- Group-Sensor Link
+CREATE TABLE GroupSensor (
+    group_sensor_id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    group_id CHAR(36) REFERENCES SensorGroup(group_id),
+    sensor_id CHAR(36) REFERENCES Sensor(sensor_id)
+);
+
+-- API Endpoints
+CREATE TABLE ApiEndpoint (
+    api_endpoint_id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    user_id CHAR(36), -- References your Django User Table
+    endpoint_url VARCHAR(255),
+    app_id VARCHAR(255),
+    api_key VARCHAR(255)
+);
