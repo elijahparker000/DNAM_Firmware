@@ -61,7 +61,11 @@ void displayInfo()
   }
   else
   {
-    Serial.print(F("INVALID"));
+    Serial.print(F("INVALID: "));
+    Serial.print(gps.location.lat(), 2);
+    Serial.print(F(","));
+    Serial.print(gps.location.lng(), 2);
+    // needed 19minutes after cold start.
   }
 
   /*Serial.print(F("  Date/Time: "));
