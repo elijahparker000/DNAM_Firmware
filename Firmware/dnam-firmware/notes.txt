@@ -1,0 +1,8 @@
+Push and Intervalls: BME 0;Soil 1;Leaf 2;PH 3;GPS 4
+			
+
+Values: bme_temp;bme_hum;bme_press;soil;leaf_moist;leaf_temp;ph;gps_lang;gps_long;gps_alt;bat
+
+If statements:
+If ((enableBME == true) OR (push[0] == 1)
+...
