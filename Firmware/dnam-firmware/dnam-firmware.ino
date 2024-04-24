@@ -62,6 +62,7 @@ The correct pin definitions can be found at the beginning of the code.
 #include <Wire.h>
 #include <TinyGPSPlus.h>
 #include <SoftwareSerial.h>
+#include <math.h>
 
 // -----------------------------------------------------------------------------------------------------
 // -------------------------------------- PIN CONFIG ---------------------------------------------------
@@ -103,6 +104,8 @@ const PinConfig pinConfig = {
   .loraRST = 16    // RST pin for LoRa
 };
 
+const int analogPin = 32; // The pin where the pH sensor is connected
+
 // -----------------------------------------------------------------------------------------------------
 // -------------------------------------- LINK LIBRARY WITH EASY NAME ----------------------------------
 // -----------------------------------------------------------------------------------------------------
@@ -119,26 +122,74 @@ SoftwareSerial ss(pinConfig.gpsRX, pinConfig.gpsTX);
 BME280I2C bme;  // Default : forced mode, standby time = 1000 ms
                 // Oversampling = bme_pressure ×1, bme_temperature ×1, bme_humidity ×1, filter off,
 
+
+//
+// For normal use, we require that you edit the sketch to replace FILLMEIN
+// with values assigned by the TTN console. However, for regression tests,
+// we want to be able to compile these scripts. The regression tests define
+// COMPILE_REGRESSION_TEST, and in that case we define FILLMEIN to a non-
+// working but innocuous value.
+//
+#ifdef COMPILE_REGRESSION_TEST
+# define FILLMEIN 0
+#else
+# warning "You must replace the values marked FILLMEIN with real values from the TTN control panel!"
+# define FILLMEIN (#dont edit this, edit the lines that use FILLMEIN)
+#endif
+
 // -----------------------------------------------------------------------------------------------------
 // -------------------------------------- LoRaWAN CONNECTION DETAILS -----------------------------------
 // -----------------------------------------------------------------------------------------------------
 
+
+// -----------------------
+// ---- Andreas Login ----
+// ------ down below -----
 // This EUI must be in little-endian format, so least-significant-byte
 // first. When copying an EUI from ttnctl output, this means to reverse
 // the bytes. For TTN issued EUIs the last bytes should be 0xD5, 0xB3,
 // 0x70.
-static const u1_t PROGMEM APPEUI[8]={ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+static const u1_t PROGMEM APPEUI[8]={ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }; // little endian (lsb)
 void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
 
 // This should also be in little endian format, see above.
-static const u1_t PROGMEM DEVEUI[8]={ 0x43, 0x6D, 0x06, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 };
+static const u1_t PROGMEM DEVEUI[8]={ 0x43, 0x6D, 0x06, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 }; // little endian (lsb)
 void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
 
 // This key should be in big endian format (or, since it is not really a
 // number but a block of memory, endianness does not really apply). In
 // practice, a key taken from ttnctl can be copied as-is.
-static const u1_t PROGMEM APPKEY[16] = { 0x27, 0xB4, 0x8D, 0xDB, 0x34, 0x03, 0x0D, 0xB6, 0xA6, 0xF8, 0x5C, 0x50, 0xA1, 0x2A, 0x79, 0xEB };
+static const u1_t PROGMEM APPKEY[16] = { 0x27, 0xB4, 0x8D, 0xDB, 0x34, 0x03, 0x0D, 0xB6, 0xA6, 0xF8, 0x5C, 0x50, 0xA1, 0x2A, 0x79, 0xEB }; // big endian (msb)
 void os_getDevKey (u1_t* buf) {  memcpy_P(buf, APPKEY, 16);}
+
+
+/*
+// -----------------------
+// ---- Elijah Login ----
+// ------ down below -----
+static const u1_t PROGMEM APPEUI[8]={ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }; // little endian (lsb)
+void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
+
+static const u1_t PROGMEM DEVEUI[8]={ 0x66, 0x1F, 0x06, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 }; // little endian (lsb)
+void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
+
+static const u1_t PROGMEM APPKEY[16] = { 0x75, 0x94, 0x2F, 0xB7, 0xD7, 0xB4, 0x95, 0xD4, 0x07, 0xE4, 0x7E, 0xFA, 0x47, 0x1E, 0xC4, 0x4F }; // big endian (msb)
+void os_getDevKey (u1_t* buf) {  memcpy_P(buf, APPKEY, 16);}
+*/
+
+/*
+// -----------------------
+// ---- Felix Login ----
+// ------ down below -----
+static const u1_t PROGMEM APPEUI[8]={ 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }; // little endian (lsb)
+void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
+
+static const u1_t PROGMEM DEVEUI[8]={ 0x28, 0x6C, 0x06, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 }; // little endian (lsb)
+void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
+
+static const u1_t PROGMEM APPKEY[16] = { 0x25, 0x7F, 0x32, 0xCF, 0xF2, 0x88, 0x2B, 0x67, 0xD2, 0x98, 0xB2, 0xD9, 0x25, 0x99, 0xE7, 0x3E }; // big endian (msb)
+void os_getDevKey (u1_t* buf) {  memcpy_P(buf, APPKEY, 16);}
+*/
 
 static osjob_t sendjob;
 
@@ -248,7 +299,7 @@ void onEvent (ev_t ev) {
                   Serial.print(LMIC.frame[LMIC.dataBeg + i], HEX);
                   Serial.print(" ");
               }
-              hexToAscii(LMIC.frame + LMIC.dataBeg, LMIC.dataLen);
+              //hexToAscii(LMIC.frame + LMIC.dataBeg, LMIC.dataLen);
               Serial.println();
             }
             // Schedule next transmission
@@ -346,7 +397,7 @@ void processPayload(const char* asciiPayload) {
     }
 
     saveSensorIntervals();
-    //clearReceivedData(); // Lösche empfangene Daten
+    clearReceivedData(); // Lösche empfangene Daten
 
     // Debug-Ausgabe
     Serial.print("updatePush: ");
@@ -402,6 +453,22 @@ bool invalidGps = 0;
 int invalidGpsCount = 0;
 const int maxInvalidGpsCount = 25;
 
+#define num_of_read 1 // number of iterations, each is actually two reads of the sensor (both directions)
+const int Rx = 27200;  //fixed resistor attached in series to the sensor and ground...the same value repeated for all WM and Temp Sensor.
+const long default_TempC = 24;
+//const long open_resistance = 35000; //check the open resistance value by replacing sensor with an open and replace the value here...this value might vary slightly with circuit components
+const long open_resistance = 50000000; //check the open resistance value by replacing sensor with an open and replace the value here...this value might vary slightly with circuit components
+//const long short_resistance = 200; // similarly check short resistance by shorting the sensor terminals and replace the value here.
+const long short_resistance = 3; // similarly check short resistance by shorting the sensor terminals and replace the value here.
+const long short_CB = 240, open_CB = 255 ;
+const float SupplyV = 3.319; // Assuming 5V output for SupplyV, this can be measured and replaced with an exact value if required
+const float cFactor = 1.1; //correction factor optional for adjusting curve, 1.1 recommended to match IRROMETER devices as well as CS CR1000
+int i, j = 0, WM1_CB = 0;
+float SenV10K = 0, SenVWM1 = 0, SenVWM2 = 0, ARead_A1 = 0, ARead_A2 = 0, WM_Resistance = 0, WM1_Resistance = 0 ;
+
+//pH
+const float referenceVoltage = 3.3; // Adjust this if your board uses a different reference voltage
+
 float bme_temp;
 float bme_hum;
 float bme_pres;
@@ -433,36 +500,46 @@ void do_send(osjob_t* j) {
 
   // Get bme_temp, bme_hum, bme_press
   if (sensorIntervals[0] == 1 || push[0] == 1) {
+    Serial.print("[BME] ");
     sensor_bme();
     push[0] = 0;
+    Serial.println(" ");
   }else{
     Serial.print("No BME; ");
   }
   // Get soil-moisture
   if (sensorIntervals[1] == 1 || push[1] == 1) {
+    Serial.print("[Soil Moisture] ");
     sensor_smoisture();
     push[1] = 0;
+    Serial.println(" ");
   }else{
     Serial.print("No Soil; ");
   }
   // Get leaf-moisture
   if (sensorIntervals[2] == 1 || push[2] == 1) {
+    Serial.print("[Leaf Moisture] ");
     sensor_leaf();
     push[2] = 0;
+    Serial.println(" ");
   }else{
     Serial.print("No Leaf; ");
   }
   // Get ph-Level
   if (sensorIntervals[3] == 1 || push[3] == 1) {
+    Serial.print("[pH] ");
     sensor_ph();
     push[3] = 0;
+    Serial.println(" ");
   }else{
     Serial.print("No PH; ");
   }
   // Get GPS - lat, long, alt
   if (sensorIntervals[4] == 1 || push[4] == 1 || (invalidGps == 1 && invalidGpsCount < maxInvalidGpsCount)) {
+    Serial.print("[GPS] ");
     sensor_gps();
     push[1] = 0;
+    Serial.println(" ");
   }else{
     Serial.println("No GPS; ... wanted ");
   }
@@ -489,7 +566,7 @@ void do_send(osjob_t* j) {
   len += bat != -1.0 ? snprintf(data + len, sizeof(data) - len, "%.2f", bat) : snprintf(data + len, sizeof(data) - len, "");
 
   // Sicherstellen, dass der String korrekt terminiert ist.
-  data[len] = '\0';
+  Serial.print("Datastring to transfer: ");
   Serial.println(data);
 
   // Send sensor data
@@ -525,7 +602,7 @@ void sensor_bme() {
 
   // Print the data before sending
   Serial.print("BME sensor data: ");
-  Serial.println(sensorData);
+  Serial.print(sensorData);
 }
 
 void sensor_gps() {
@@ -543,12 +620,12 @@ void sensor_gps() {
       invalidGps = 0;
       invalidGpsCount = 0;
       Serial.print("GPS data: ");
-      Serial.println(gpsData);
+      Serial.print(gpsData);
     } else {
       invalidGps = 1;
       invalidGpsCount++;
       Serial.print(F("GPS data not valid. Try Number: "));
-      Serial.println(invalidGpsCount);
+      Serial.print(invalidGpsCount);
       // Schedule the next regular sensor data transmission
       ////os_setTimedCallback(&sendjob, os_getTime() + sec2osticks(TX_INTERVAL), do_send);
     }
@@ -562,15 +639,118 @@ void sensor_bat() {
 }
 
 void sensor_ph() {
-  ph = 5.0;
-  //Serial.print("ph-Level: ");
-  //Serial.println(ph);
+  int sensorValue = analogRead(analogPin); // Read the value from the analog pin
+  float voltage = sensorValue * (referenceVoltage / 4096.0); // Convert the value to voltage
+  float pHV = (-5.6548 * voltage) + 15.509; // Calculate pH from the voltage
+
+  if(pHV > 14){
+    Serial.print("No valid pH value. Probably not connected - pH: ");
+    Serial.print(pHV, 2);
+    ph = -1.0;
+  }else{
+    // Print the voltage and pH value to the Serial Monitor
+    Serial.print("Voltage: ");
+    Serial.print(voltage, 4); // Print the voltage with 4 decimal places
+    Serial.print(" V, pH: ");
+    Serial.print(pHV, 2); // Print the pH value with 2 decimal places
+    ph = pHV;
+  }
 }
+
 void sensor_smoisture() {
-  smoisture = 40.2;
-  //Serial.print("Soil Moisture: ");
-  //Serial.println(smoisture);
+  //Read the first Watermark sensor
+
+  WM1_Resistance = readWMsensor();
+  WM1_CB = myCBvalue(WM1_Resistance, default_TempC, cFactor);
+
+  //*****************output************************************
+
+  Serial.print("WM1 Resistance(Ohms)= ");
+  Serial.print(WM1_Resistance);
+  Serial.print("; WM1(cb/kPa)= ");
+  Serial.print(abs(WM1_CB));
+  Serial.print(" ");
+
+  smoisture = WM1_CB;
 }
+
+//conversion of ohms to CB
+int myCBvalue(int res, float TC, float cF) {   //conversion of ohms to CB
+  int WM_CB;
+  float resK = res / 1000.0;
+  float tempD = 1.00 + 0.018 * (TC - 24.00);
+
+  if (res > 550.00) { //if in the normal calibration range
+    if (res > 8000.00) { //above 8k
+      WM_CB = (-2.246 - 5.239 * resK * (1 + .018 * (TC - 24.00)) - .06756 * resK * resK * (tempD * tempD)) * cF;
+    } else if (res > 1000.00) { //between 1k and 8k
+      WM_CB = (-3.213 * resK - 4.093) / (1 - 0.009733 * resK - 0.01205 * (TC)) * cF ;
+    } else { //below 1k
+      WM_CB = (resK * 23.156 - 12.736) * tempD;
+    }
+  } else { //below normal range but above short (new, unconditioned sensors)
+    if (res > 300.00)  {
+      WM_CB = 0.00;
+    }
+    if (res < 300.00 && res >= short_resistance) { //wire short
+      WM_CB = short_CB; //240 is a fault code for sensor terminal short
+      Serial.print("Sensor Short WM ");
+    }
+  }
+  if (res >= open_resistance || res==0) {
+
+    WM_CB = open_CB; //255 is a fault code for open circuit or sensor not present
+
+  }
+  return WM_CB;
+}
+
+//read ADC and get resistance of sensor
+float readWMsensor() {
+  ARead_A1 = 0;
+  ARead_A2 = 0;
+
+  for (i = 0; i < num_of_read; i++) //the num_of_read initialized above, controls the number of read successive read loops that is averaged.
+  {
+
+    digitalWrite(12, HIGH);   //Set pin 12 as Vs
+    delayMicroseconds(90); //wait 90 micro seconds and take sensor read
+    ARead_A1 += analogRead(14); // read the analog pin and add it to the running total for this direction
+    digitalWrite(12, LOW);      //set the excitation voltage to OFF/LOW
+
+    delay(100); //0.1 second wait before moving to next channel or switching MUX
+
+    // Now lets swap polarity, pin 12 is already low
+
+    digitalWrite(27, HIGH); //Set pin 27 as Vs
+    delayMicroseconds(90); //wait 90 micro seconds and take sensor read
+    ARead_A2 += analogRead(14); // read the analog pin and add it to the running total for this direction
+    digitalWrite(27, LOW);      //set the excitation voltage to OFF/LOW
+  }
+
+  SenVWM1 = ((ARead_A1 / 4096) * SupplyV) / (num_of_read); //get the average of the readings in the first direction and convert to volts
+  Serial.print("First direction voltage: ");
+  Serial.print(SenVWM1);
+  SenVWM2 = ((ARead_A2 / 4096) * SupplyV) / (num_of_read); //get the average of the readings in the second direction and convert to volts
+  Serial.print("; Second direction voltage: ");
+  Serial.print(SenVWM2);
+  Serial.print("; ");
+
+  //double WM_ResistanceA = (Rx * (SupplyV - SenVWM1) / SenVWM1); //do the voltage divider math, using the Rx variable representing the known resistor
+  //double WM_ResistanceA = Rx * SenVWM1 / (SupplyV - SenVWM1);  // reverse
+  double WM_ResistanceA = (Rx * (1/((SupplyV/SenVWM1)-1))); //my attempt
+  Serial.print("WM_ResistanceA: ");
+  Serial.print(WM_ResistanceA);
+  //double WM_ResistanceB = Rx * SenVWM2 / (SupplyV - SenVWM2);  // reverse
+  //double WM_ResistanceB = (Rx * (SupplyV - SenVWM2) / SenVWM2); //do the voltage divider math, using the Rx variable representing the known resistor
+  double WM_ResistanceB = Rx * ((SupplyV/SenVWM2)-1);  // my attempt
+  Serial.print("; WM_ResistanceB: ");
+  Serial.print(WM_ResistanceB);
+  Serial.print("; ");
+  double WM_Resistance = ((WM_ResistanceA + WM_ResistanceB) / 2); //average the two directions
+  return WM_Resistance;
+}
+
 void sensor_leaf() {
   lmoisture = 33.69;
   ltemp = 42.01;
@@ -603,9 +783,11 @@ void setup() {
     }
 
     // Temporary Value write
-    //for (int i = 0; i < 5; i++) {
-    //  sensorIntervals[i] = 1;
-    //}
+    sensorIntervals[0] = 1; //BME
+    sensorIntervals[1] = 1; //Soil
+    sensorIntervals[2] = 1; //Leaf
+    sensorIntervals[3] = 1; //pH
+    sensorIntervals[4] = 1; //GPS
 
     // Gebe die Werte einmalig aus
     Serial.print("saved Sensor intervals: ");
@@ -650,6 +832,18 @@ void setup() {
     digitalWrite(VCC_ENABLE, HIGH);
     delay(1000);
     #endif
+
+    // Soil Moisture
+    // initialize the pins, 12 and 27 randomly chosen. In the voltage divider circuit example in figure 1(www.irrometer.com/200ss.html), pin 27 is the "Output Pin" and pin 12 is the "GND".
+    // if the direction is reversed, the WM1_Resistance A and B formulas would have to be swapped.
+    pinMode(12, OUTPUT);
+    pinMode(27, OUTPUT);
+    //set both low
+    digitalWrite(12, LOW);
+    digitalWrite(27, LOW);
+
+    // pH Sensor
+    analogReadResolution(12); // Set the ADC resolution to 12 bits (4096 levels)
 
     // LMIC init
     os_init();
